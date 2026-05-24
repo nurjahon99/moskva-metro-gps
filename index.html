@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moskva Metrosi - Real Vaqtda GPS</title>
+    <title>Moskva Metro Sxemasi - Real Vaqtda GPS</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -12,13 +12,14 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
         }
         
         body, html {
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background-color: #111; /* Metro sxemasi qorong'i fonda chiroyli ko'rinadi */
         }
 
         #map {
@@ -27,77 +28,71 @@
             z-index: 1;
         }
 
-        /* UI Panellar */
+        /* GPS Status paneli */
         .status-panel {
             position: absolute;
-            top: 10px;
+            top: 12px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 1000;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 12px 20px;
-            border-radius: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            background: rgba(30, 30, 30, 0.9);
+            color: #ffffff;
+            padding: 12px 18px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             text-align: center;
-            width: 90%;
-            max-width: 400px;
-            font-size: 14px;
+            width: 85%;
+            max-width: 380px;
+            font-size: 13px;
+            border: 1px solid #333;
         }
 
         .status-title {
             font-weight: bold;
-            color: #d32f2f;
-            margin-bottom: 4px;
+            color: #ff9800;
+            margin-bottom: 3px;
+            font-size: 14px;
         }
 
         .coords {
             font-family: monospace;
-            color: #555;
-            font-size: 12px;
+            color: #aaa;
+            font-size: 11px;
         }
 
         .controls {
             position: absolute;
-            bottom: 30px;
+            bottom: 25px;
             right: 20px;
             z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
         }
 
         .btn {
-            background: #ffffff;
+            background: #ff9800;
             border: none;
-            width: 50px;
-            height: 50px;
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            transition: background 0.3s;
+            font-size: 24px;
+            transition: transform 0.2s;
         }
 
         .btn:active {
-            background: #e0e0e0;
-        }
-
-        /* Metropoliten liniyalari va bekatlar uchun sodda stil (Moslashtirish uchun) */
-        .metro-popup {
-            text-align: center;
-            font-weight: bold;
+            transform: scale(0.9);
         }
     </style>
 </head>
 <body>
 
     <div class="status-panel">
-        <div class="status-title" id="status-text">GPS signal qidirilmoqda...</div>
+        <div class="status-title" id="status-text">Metro GPS tizimi yuklanmoqda...</div>
         <div class="coords" id="gps-coords">Kenglik: -- | Uzunlik: --</div>
-        <div id="accuracy" style="font-size: 11px; color: #77h; margin-top: 2px;">Aniqlik darajasi: --</div>
+        <div id="accuracy" style="font-size: 11px; color: #bbb; margin-top: 2px;">Aniqlik: --</div>
     </div>
 
     <div class="controls">
@@ -109,110 +104,94 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        // Moskva markazi koordinatalari (Xarita boshlang'ich holati)
-        const moscowCenter = [55.7558, 37.6173];
+        // Moskva markazi koordinatalari
+        const moscowCenter = [55.7522, 37.6156];
         
         // Xaritani yaratish
         const map = L.map('map', {
-            zoomControl: false // Mobil qurilmalar uchun qulaylik maqsadida standart tugmalarni ochirish
-        }).setView(moscowCenter, 13);
+            zoomControl: false,
+            minZoom: 10,
+            maxZoom: 15
+        }).setView(moscowCenter, 11);
 
-        // Ochiq xarita qatlamini qo'shish (OpenStreetMap)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
+        // MUHIM: Oddiy xarita o'rniga Moskva Metro Sxemasi qatlamini qo'shish (Thunderforest / OpenCycleMap transport qatlami)
+        // Bu qatlam aynan metro liniyalari va bekatlariga urg'u beradi
+        L.tileLayer('https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=a5dd1a44c07d4ff38cf0ef216503c80a', {
+            attribution: '© OpenStreetMap & Thunderforest',
+            maxZoom: 15
         }).addTo(map);
-
-        // Standart masshtab tugmalarini pastga chap burchakka joylashtirish
-        L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
         let userMarker = null;
         let accuracyCircle = null;
         let isFirstLoad = true;
 
-        // GPS ma'lumotlarini kuzatish funksiyasi (Juda aniq rejimda)
+        // GPS'ni yuqori aniqlikda kuzatish
         if ("geolocation" in navigator) {
             const geoOptions = {
-                enableHighAccuracy: true, // GEOLOCATION'NI ENG YUQORI ANIQLIKDA ISHLATISH (GPS elementini yoqadi)
-                timeout: 10000,           // Signal kutish vaqti: 10 soniya
-                maximumAge: 0             // Keshlangan ma'lumotdan foydalanmaslik, har doim yangi koordinata olish
+                enableHighAccuracy: true, 
+                timeout: 15000,           
+                maximumAge: 0             
             };
 
-            // watchPosition real vaqt rejimida harakatni kuzatib boradi
             navigator.geolocation.watchPosition(successLocation, errorLocation, geoOptions);
         } else {
-            document.getElementById('status-text').innerText = "Brauzeringizda GPS xizmati mavjud emas.";
+            document.getElementById('status-text').innerText = "Brauzerda GPS qo'llab-quvvatlanmaydi.";
         }
 
-        // Lokatsiya muvaffaqiyatli aniqlanganda ishlaydigan funksiya
         function successLocation(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            const accuracy = position.coords.accuracy; // Metrdagi aniqlik xatoligi
+            const accuracy = position.coords.accuracy;
 
             document.getElementById('gps-coords').innerText = `Kenglik: ${lat.toFixed(5)} | Uzunlik: ${lng.toFixed(5)}`;
-            document.getElementById('accuracy').innerText = `Aniqlik xatoligi: ${accuracy.toFixed(1)} metr`;
-            document.getElementById('status-text').innerText = "Harakat kuzatilmoqda...";
-            document.getElementById('status-text').style.color = "#2e7d32";
+            document.getElementById('accuracy').innerText = `Xatolik: ${accuracy.toFixed(1)} metr`;
+            document.getElementById('status-text').innerText = "Metroda harakat kuzatilmoqda";
+            document.getElementById('status-text').style.color = "#4caf50";
 
-            // Agar foydalanuvchi belgisi oldin yaratilmagan bo'lsa, yangi yaratish
+            // Metro sxemasidagi foydalanuvchi belgisi (Yorqin qizil/olovrang nuqta)
             if (!userMarker) {
-                // Foydalanuvchi nuqtasi (ko'k rangli marker)
                 userMarker = L.circleMarker([lat, lng], {
-                    radius: 9,
-                    color: '#fff',
+                    radius: 10,
+                    color: '#ffffff',
                     weight: 3,
-                    fillColor: '#007bff',
+                    fillColor: '#ff1744',
                     fillOpacity: 1
                 }).addTo(map).bindPopup("Siz shu yerdasiz").openPopup();
 
-                // Aniqlik doirasi
                 accuracyCircle = L.circle([lat, lng], {
                     radius: accuracy,
-                    color: '#007bff',
+                    color: '#ff1744',
                     weight: 1,
-                    fillColor: '#007bff',
+                    fillColor: '#ff1744',
                     fillOpacity: 0.15
                 }).addTo(map);
 
             } else {
-                // Agar marker mavjud bo'lsa, faqat uning koordinatasini yangilash
                 userMarker.setLatLng([lat, lng]);
                 accuracyCircle.setLatLng([lat, lng]);
                 accuracyCircle.setRadius(accuracy);
             }
 
-            // Dastur birinchi marta ochilganda xaritani avtomatik foydalanuvchiga qaratish
             if (isFirstLoad) {
-                map.setView([lat, lng], 16);
+                map.setView([lat, lng], 13); // Metro bekatlari aniq ko'rinishi uchun yaqinlashtiramiz
                 isFirstLoad = false;
             }
         }
 
-        // GPS xatolik yuz berganda
         function errorLocation(error) {
-            let errorMsg = "GPS aniqlashda xatolik.";
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMsg = "GPS'ga ruxsat berilmadi! Iltimos, brauzerda geolokatsiyani yoqing.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMsg = "Joylashuv ma'lumotlari mavjud emas (Signal past).";
-                    break;
-                case error.TIMEOUT:
-                    errorMsg = "GPS signal kutish vaqti tugadi.";
-                    break;
+            let errorMsg = "GPS aniqlanmadi.";
+            if(error.code === error.PERMISSION_DENIED) {
+                errorMsg = "GPS ruxsatnomasi o'chiq!";
             }
             document.getElementById('status-text').innerText = errorMsg;
-            document.getElementById('status-text').style.color = "#d32f2f";
+            document.getElementById('status-text').style.color = "#ff1744";
         }
 
-        // "Mening joylashuvim" tugmasi bosilganda xaritani markazlashtirish
         document.getElementById('locate-btn').addEventListener('click', () => {
             if (userMarker) {
-                map.setView(userMarker.getLatLng(), 17);
+                map.setView(userMarker.getLatLng(), 14);
             } else {
-                alert("GPS koordinatalari hali olinmadi. Iltimos, biroz kuting...");
+                alert("GPS aniqlanmoqda, kuting...");
             }
         });
     </script>
