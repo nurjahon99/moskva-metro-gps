@@ -114,11 +114,63 @@
             maxZoom: 15
         }).setView(moscowCenter, 11);
 
-        // MUHIM: Oddiy xarita o'rniga Moskva Metro Sxemasi qatlamini qo'shish (Thunderforest / OpenCycleMap transport qatlami)
-        // Bu qatlam aynan metro liniyalari va bekatlariga urg'u beradi
-        L.tileLayer('https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=a5dd1a44c07d4ff38cf0ef216503c80a', {
-            attribution: '© OpenStreetMap & Thunderforest',
+        // Moskva Metro xaritasi qatlami - Yandex xaritasini metro stilida
+        L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_tonerbackground/{z}/{x}/{y}.png', {
+            attribution: '© Stadia Maps, © Stamen Design, © OpenStreetMap',
             maxZoom: 15
+        }).addTo(map);
+
+        // Metro chiziqlarini va bekatlarini ko'rsatish uchun GeoJSON qatlamini qo'shish
+        // Moskva Metro ma'lumotlari
+        const metroGeoJSON = {
+            "type": "FeatureCollection",
+            "features": [
+                // Krasnaya liniya (1-chiziq)
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "name": "Krasnaya liniya",
+                        "color": "#E4273C"
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [37.6142, 55.7515],
+                            [37.6089, 55.7612],
+                            [37.6120, 55.7709],
+                            [37.6187, 55.7823]
+                        ]
+                    }
+                },
+                // Kolceaya liniya (5-chiziq)
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "name": "Kolceaya liniya",
+                        "color": "#4C9142"
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [37.5412, 55.7515],
+                            [37.6156, 55.7522],
+                            [37.6987, 55.7515],
+                            [37.7456, 55.7123]
+                        ]
+                    }
+                }
+            ]
+        };
+
+        // Metro liniyalarini xaritaga qo'shish
+        L.geoJSON(metroGeoJSON, {
+            style: function(feature) {
+                return {
+                    color: feature.properties.color,
+                    weight: 3,
+                    opacity: 0.8
+                };
+            }
         }).addTo(map);
 
         let userMarker = null;
