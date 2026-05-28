@@ -114,10 +114,10 @@
             maxZoom: 15
         }).setView(moscowCenter, 11);
 
-        // Moskva Metro xaritasi qatlami - Yandex xaritasini metro stilida
-        L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_tonerbackground/{z}/{x}/{y}.png', {
-            attribution: '© Stadia Maps, © Stamen Design, © OpenStreetMap',
-            maxZoom: 15
+        // OpenStreetMap tile-larini (bepul va authorization-siz) qo'shish
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
         }).addTo(map);
 
         // Metro chiziqlarini va bekatlarini ko'rsatish uchun GeoJSON qatlamini qo'shish
